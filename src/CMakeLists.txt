@@ -11,6 +11,19 @@
 
 find_package(JPEG REQUIRED)
 
-add_executable(upload_image upload_image.c)
+add_library(upload_image upload_image/upload_image.c upload_image/upload_image.h)
+target_include_directories(upload_image
+    PUBLIC
+    upload_image
+)
+target_link_libraries(upload_image 
+    PRIVATE 
+    JPEG::JPEG
+)
 
-target_link_libraries(upload_image PRIVATE JPEG::JPEG)
+add_executable(blur blur.c)
+
+target_link_libraries(blur 
+    PRIVATE 
+    upload_image
+)

@@ -3,6 +3,8 @@ Most of this code was referenced from: https://github.com/aumuell/libjpeg-turbo/
 */
 
 // NOLINTBEGIN(llvm-include-order)
+#include "upload_image.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -10,14 +12,7 @@ Most of this code was referenced from: https://github.com/aumuell/libjpeg-turbo/
 #include <jpeglib.h>
 // NOLINTEND(llvm-include-order)
 
-
-int main(int argc, char *argv[]) {
-    // Ensures there is at least one argument
-    if (argc != 2) {
-        (void)fprintf(stderr, "Usage: %s <input_jpeg_file>\n", argv[0]);
-        return 1;
-    }
-
+unsigned char* upload_image(char* path, ImageSize* out_size) {
     //JPEG depression parameters
     struct jpeg_decompress_struct cinfo;
     // Library error handler
@@ -29,9 +24,9 @@ int main(int argc, char *argv[]) {
     int row_stride = 0;
 
     // Get file data and write it to infile pointer
-    if ((infile = fopen(argv[1], "rbe")) == NULL) {
-        (void)fprintf(stderr, "Can't open %s\n", argv[1]);
-        return 1;
+    if ((infile = fopen(path, "rbe")) == NULL) {
+        (void)fprintf(stderr, "Can't open %s\n", path);
+        exit(EXIT_FAILURE);
     }
 
     cinfo.err = jpeg_std_error(&jerr);
@@ -48,10 +43,13 @@ int main(int argc, char *argv[]) {
     jpeg_start_decompress(&cinfo);
 
     // Printing out file information for better debug
-    printf("Filename: %s\n", argv[1]);
+    printf("Filename: %s\n", path);
     printf("Width: %d\n", (int) cinfo.output_width);
     printf("Height: %d\n", (int) cinfo.output_height);
     printf("Bytes: %d\n", (int) cinfo.output_width * (int) cinfo.output_height * cinfo.output_components);
+
+    out_size->width = (int) cinfo.output_width;
+    out_size->height = (int) cinfo.output_height;
 
     // Note to self: output_components is the byte size of one pixel (RGB), should be 3?
     row_stride = (int) cinfo.output_width * cinfo.output_components;
@@ -68,7 +66,7 @@ int main(int argc, char *argv[]) {
         (void)fprintf(stderr, "Memory allocation failed\n");
         jpeg_destroy_decompress(&cinfo);
         (void)fclose(infile);
-        return 1;
+        exit(EXIT_FAILURE);
     }
 
     int current_row = 0;
@@ -84,7 +82,6 @@ int main(int argc, char *argv[]) {
     jpeg_finish_decompress(&cinfo);
     jpeg_destroy_decompress(&cinfo);
     (void)fclose(infile);
-    free(rgb_data);
 
-    return 0;
+    return rgb_data;
 }
