@@ -6,7 +6,7 @@
 #include <string.h>
 
 void median_blur(unsigned char* rgb_data){
-    float blurring_kernel
+    return;
 }
 
 int main(int argc, char *argv[]) {
