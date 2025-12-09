@@ -8,3 +8,9 @@
 # or similar. The PRIVATE/INTERFACE/PUBLIC keyword will depend on whether the
 # library is used only in function bodies (PRIVATE), only in function
 # signatures/types (INTERFACE), or both (PUBLIC).
+
+find_package(JPEG REQUIRED)
+
+add_executable(upload_image upload_image.c)
+
+target_link_libraries(upload_image PRIVATE JPEG::JPEG)
