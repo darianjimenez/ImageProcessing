@@ -9,62 +9,39 @@ Inspiration from https://medium.com/@julianawrites/the-thrilling-mathematics-of-
 #include <stdlib.h>
 #include <string.h>
 
-void mean(unsigned char* restrict rgb_data, const ImageSize* image_size, const int kernel_size){
+void mean(const unsigned char* restrict rgb_data, unsigned char* output, const ImageSize* image_size, const int kernel_size){
     // Factor to apply to all bytes in rgb_arr
     // Choose float because it is less memory usage than double and we do not need that precision
-    float factor = (float) 1.0 / ((float)(kernel_size * kernel_size));
-
-    // Initialize factored rgb_arr
-    size_t array_size = (size_t) image_size->width * (size_t) image_size->height * (size_t) 3;
-    float* factored_rgb_data = (float*) malloc(array_size * sizeof(float));
-    if (!factored_rgb_data) {
-        (void)fprintf(stderr, "Memory allocation failed for factored_rgb_data\n");
-        exit(EXIT_FAILURE);
-    }
-
-    // apply factor to all elements in rgb array (design decision: saves processing time but increases memory usage)
-    for(int i = 0; i < image_size->width * image_size->height * 3; i++){
-        factored_rgb_data[i] = ((float) rgb_data[i] * factor);
-    }
+    const float factor = (float) 1.0 / ((float)(kernel_size * kernel_size));
 
     // Loop through every pixel
 
-    int init_val = kernel_size/2;
+    int offset = kernel_size/2;
+    const int stride = image_size->width * 3;
 
     float sum[3] = {0, 0, 0};
-    for(int col_px = init_val; col_px < image_size -> height - init_val; col_px++){
-        for(int row_px = init_val; row_px < image_size -> width - init_val; row_px++){
+    // Traverse across row first because better for cache
+    for(int window_y = 0; window_y < image_size -> height - kernel_size + 1; window_y++){
+        for(int window_x = 0; window_x < image_size -> width - kernel_size + 1; window_x++){
             // Calculate new rgb from mean of specific pixel
             sum[0] = (float) 0.0;
             sum[1] = (float) 0.0;
             sum[2] = (float) 0.0;
-            for(int col = 0; col < (kernel_size + 1)/2; col++){
-                for(int row = 0; row < (kernel_size - 1) / 2 * 3 + 1; row = row + 3){
-                    int center = (col_px * image_size->width + row_px) * 3;
+
+            // Traverse across row first (from column to column) because better for cache
+            for(int row = 0; row < kernel_size; row++){
+                for(int col = 0; col < kernel_size; col++){
                     for(int add_byte = 0; add_byte < 3; add_byte++){
-                        // For row <= 0 and col <= 0
-                        sum[add_byte] = sum[add_byte] + factored_rgb_data[center + image_size -> width * 3 * col + row + add_byte];
-                        // To add reflective of rows less than 0
-                        if(row != 0){
-                            sum[add_byte] = sum[add_byte] + factored_rgb_data[center + image_size -> width * 3 * col - row + add_byte];
-                        }
-                        // To add reflective of cols less than 0 
-                        if(col != 0){
-                            sum[add_byte] = sum[add_byte] + factored_rgb_data[center - image_size -> width * 3 * col + row + add_byte];
-                            if(row != 0){
-                                sum[add_byte] = sum[add_byte] + factored_rgb_data[center - image_size -> width * 3 * col - row + add_byte];
-                            }
-                        }
+                        sum[add_byte] = sum[add_byte] + rgb_data[(window_y + row) * stride + (window_x + col) * 3 + add_byte];
                     }
                 }
             }
-            rgb_data[(col_px * image_size->width + row_px) * 3] = (unsigned char) sum[0];
-            rgb_data[(col_px * image_size->width + row_px) * 3 + 1] = (unsigned char) sum[1];
-            rgb_data[(col_px * image_size->width + row_px) * 3 + 2] = (unsigned char) sum[2];
+
+            output[(window_y + offset) * stride + (window_x + offset) * 3] = (unsigned char) (sum[0] * factor);
+            output[(window_y + offset) * stride + (window_x + offset) * 3 + 1] = (unsigned char) (sum[1] * factor);
+            output[(window_y + offset) * stride + (window_x + offset) * 3 + 2] = (unsigned char) (sum[2] * factor);
         }
     }
-
-    free(factored_rgb_data);
 }
 
 int main(int argc, char *argv[]){
@@ -93,13 +70,21 @@ int main(int argc, char *argv[]){
     // Note to self: rgb_data is allocated so must be freed
     unsigned char* rgb_data = upload_image(argv[1], &image_size);
 
-    mean(rgb_data, &image_size, kernel_size);
+    size_t array_size = (size_t) image_size.width * (size_t) image_size.height * (size_t) 3;
+    unsigned char* output = (unsigned char*) malloc(array_size * sizeof(unsigned char));
+    if (!output) {
+        (void)fprintf(stderr, "Memory allocation failed for output\n");
+        exit(EXIT_FAILURE);
+    }
+
+    mean(rgb_data, output, &image_size, kernel_size);
 
     // SAVE THE JPEG!
     const int QUALITY = 100;
-    save_jpeg("output.jpg", rgb_data, image_size.width, image_size.height, QUALITY);
+    save_jpeg("output.jpg", output, image_size.width, image_size.height, QUALITY);
 
     // cleanup
+    free(output);
     free(rgb_data);
 
     return 0;
