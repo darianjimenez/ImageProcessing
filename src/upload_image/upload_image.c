@@ -1,5 +1,5 @@
 /*
-Most of this code was referenced from: https://github.com/aumuell/libjpeg-turbo/blob/master/example.c#L284
+Code for upload_image was referenced from: https://github.com/aumuell/libjpeg-turbo/blob/master/example.c#L284
 */
 
 // NOLINTBEGIN(llvm-include-order)
@@ -12,7 +12,7 @@ Most of this code was referenced from: https://github.com/aumuell/libjpeg-turbo/
 #include <jpeglib.h>
 // NOLINTEND(llvm-include-order)
 
-unsigned char* upload_image(char* path, ImageSize* out_size) {
+unsigned char* upload_image(char* path, ImageSize* out_size){
     //JPEG depression parameters
     struct jpeg_decompress_struct cinfo;
     // Library error handler
@@ -63,7 +63,7 @@ unsigned char* upload_image(char* path, ImageSize* out_size) {
     // Allocates memory to store all of RGB data
     unsigned char *rgb_data = (unsigned char *)malloc((size_t) cinfo.output_width * (size_t) cinfo.output_height * (size_t) cinfo.output_components);
     if (!rgb_data) {
-        (void)fprintf(stderr, "Memory allocation failed\n");
+        (void)fprintf(stderr, "Memory allocation failed for rgb_data\n");
         jpeg_destroy_decompress(&cinfo);
         (void)fclose(infile);
         exit(EXIT_FAILURE);
@@ -84,4 +84,44 @@ unsigned char* upload_image(char* path, ImageSize* out_size) {
     (void)fclose(infile);
 
     return rgb_data;
+}
+
+/*
+Implemented by ChatGPT: https://chatgpt.com/c/693de5c4-18d4-8328-8da4-fc5319679421 due to partner dropping out
+*/
+void save_jpeg(const char *filename, unsigned char *rgb_data, int width, int height, int quality){
+    struct jpeg_compress_struct cinfo;
+    struct jpeg_error_mgr jerr;
+
+    FILE *outfile = fopen(filename, "wb");
+    if (!outfile) {
+        perror("fopen");
+        return;
+    }
+
+    cinfo.err = jpeg_std_error(&jerr);
+    jpeg_create_compress(&cinfo);
+    jpeg_stdio_dest(&cinfo, outfile);
+
+    cinfo.image_width = width;
+    cinfo.image_height = height;
+    cinfo.input_components = 3;
+    cinfo.in_color_space = JCS_RGB;
+
+    jpeg_set_defaults(&cinfo);
+    jpeg_set_quality(&cinfo, quality, TRUE);
+
+    jpeg_start_compress(&cinfo, TRUE);
+
+    JSAMPROW row_pointer[1];
+    int row_stride = width * 3;
+
+    while (cinfo.next_scanline < cinfo.image_height) {
+        row_pointer[0] = &rgb_data[cinfo.next_scanline * row_stride];
+        jpeg_write_scanlines(&cinfo, row_pointer, 1);
+    }
+
+    jpeg_finish_compress(&cinfo);
+    jpeg_destroy_compress(&cinfo);
+    fclose(outfile);
 }
